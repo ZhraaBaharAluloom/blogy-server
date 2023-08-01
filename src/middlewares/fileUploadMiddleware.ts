@@ -1,12 +1,14 @@
 import multer from "multer";
 
-const storage = multer.diskStorage({
-  destination: "./media",
-  filename: (req, file, cb) => {
-    cb(null, `${+new Date()}${file.originalname}`);
-  },
-});
-
 export const upload = multer({
-  storage,
+  dest: "media/",
+  limits: {
+    fileSize: 1000000,
+  },
+  fileFilter(req, file, cb) {
+    if (!file.originalname.match(/\.(jpg|jpeg|png)$/)) {
+      return cb(new Error("Please upload a pdf file"));
+    }
+    cb(null, true);
+  },
 });
