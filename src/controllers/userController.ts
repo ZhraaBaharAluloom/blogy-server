@@ -1,4 +1,11 @@
-import { Controller, Get, Post, Req, Res } from "@decorators/express";
+import {
+  Controller,
+  Get,
+  Post,
+  Req,
+  Res,
+  Middleware,
+} from "@decorators/express";
 import { Request, Response } from "express";
 import User from "../entities/user";
 import bcrypt from "bcrypt";
@@ -6,6 +13,7 @@ import jwt from "jsonwebtoken";
 import passport from "passport";
 import { keys } from "../config/keys";
 import BlogUser from "../entities/user";
+import { upload } from "../middlewares/fileUploadMiddleware";
 
 @Controller("/auth")
 class UserController {
@@ -44,30 +52,47 @@ class UserController {
 
   @Post("/signup")
   async signUp(@Req() req: Request, @Res() res: Response) {
-    try {
-      const hashedPassword = await bcrypt.hash(
-        req.body.password,
-        this.saltRounds
-      );
+    upload(req, res, async (err) => {
+      try {
+        if (err) {
+          return res.status(422).send({
+            errors: [{ title: "Image Upload Error", detail: err.message }],
+          });
+        }
 
-      req.body.password = hashedPassword;
+        // const file = req.file;
+        // if (!file) {
+        //   return res.status(400).json({
+        //     status: "failed",
+        //     code: "400",
+        //     message: "Please upload file",
+        //   });
+        // }
+        const hashedPassword = await bcrypt.hash(req.body.password, 10);
 
-      let newUser = new BlogUser();
-      newUser.username = req.body.username;
-      newUser.password = req.body.password;
-      newUser.profileImg = req.body.profileImg;
-      newUser.fullName = req.body.fullName;
-      newUser.formattedCreatedDate = req.body.formattedCreatedDate;
-      const createdUser = await BlogUser.save(newUser);
+        req.body.password = hashedPassword;
 
-      const token = this.generateToken(createdUser);
+        let newUser = new BlogUser();
+        newUser.username = req.body.username;
+        newUser.password = req.body.password;
+        newUser.fullName = req.body.fullName;
 
-      res.json({ token });
-    } catch (error) {
-      return res
-        .status(422)
-        .json({ message: `Internal server error ${error}` });
-    }
+        if (req.file) {
+          newUser.profileImg = `/${req.file.path}`; // You may want to save the file name or path in the database
+        }
+
+        const createdUser = await BlogUser.save(newUser);
+
+        const token = this.generateToken(createdUser);
+
+        res.json({ token });
+      } catch (err) {
+        return res.status(200).json({
+          status: "failed",
+          code: "500",
+        });
+      }
+    });
   }
 
   @Post("/signin")
